@@ -9,11 +9,11 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="TJMPromos Job CC"/>
   <Description DefaultValue="Internal add-in for TJMPromos to manage job+ CC addresses."/>
-  <IconUrl DefaultValue="https://sageedsall.github.io/assets/tjmlogo.png"/>
-  <HighResolutionIconUrl DefaultValue="https://sageedsall.github.io/assets/tjmlogo.png"/>
-  <SupportUrl DefaultValue="https://sageedsall.github.io/support"/>
+  <IconUrl DefaultValue="https://tjmpromos.github.io/assets/tjmlogo.png"/>
+  <HighResolutionIconUrl DefaultValue="https://tjmpromos.github.io/assets/tjmlogo.png"/>
+  <SupportUrl DefaultValue="https://tjmpromos.github.io/support"/>
   <AppDomains>
-    <AppDomain>https://sageedsall.github.io</AppDomain>
+    <AppDomain>https://tjmpromos.github.io</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Mailbox"/>
@@ -26,7 +26,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://sageedsall.github.io/taskpane.html"/>
+        <SourceLocation DefaultValue="https://tjmpromos.github.io/taskpane.html"/>
         <RequestedHeight>250</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -73,12 +73,12 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://sageedsall.github.io/assets/tjmlogo.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://sageedsall.github.io/assets/tjmlogo.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://sageedsall.github.io/assets/tjmlogo.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://tjmpromos.github.io/assets/tjmlogo.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://tjmpromos.github.io/assets/tjmlogo.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://tjmpromos.github.io/assets/tjmlogo.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://sageedsall.github.io/taskpane.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://tjmpromos.github.io/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="CommandsGroup.Label" DefaultValue="TJMPromos Tools"/>

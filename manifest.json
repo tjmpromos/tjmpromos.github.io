@@ -36,7 +36,7 @@
         }
     },
     "validDomains": [
-        "https://sageedsall.github.io"
+        "https://tjmpromos.github.io"
     ],
     "extensions": [
         {
@@ -65,7 +65,7 @@
                     "id": "TaskPaneRuntime",
                     "type": "general",
                     "code": {
-                        "page": "https://sageedsall.github.io/taskpane.html"
+                        "page": "https://tjmpromos.github.io/taskpane.html"
                     },
                     "lifetime": "short",
                     "actions": [
@@ -97,15 +97,15 @@
                                     "icons": [
                                         {
                                             "size": 16,
-                                            "url": "https://sageedsall.github.io/assets/icon-16.png"
+                                            "url": "https://tjmpromos.github.io/assets/icon-16.png"
                                         },
                                         {
                                             "size": 32,
-                                            "url": "https://sageedsall.github.io/assets/icon-32.png"
+                                            "url": "https://tjmpromos.github.io/assets/icon-32.png"
                                         },
                                         {
                                             "size": 80,
-                                            "url": "https://sageedsall.github.io/assets/tjmlogo.png"
+                                            "url": "https://tjmpromos.github.io/assets/tjmlogo.png"
                                         }
                                     ],
                                     "controls": [
@@ -116,15 +116,15 @@
                                             "icons": [
                                                 {
                                                     "size": 16,
-                                                    "url": "https://sageedsall.github.io/assets/tjmlogo.png"
+                                                    "url": "https://tjmpromos.github.io/assets/tjmlogo.png"
                                                 },
                                                 {
                                                     "size": 32,
-                                                    "url": "https://sageedsall.github.io/assets/tjmlogo.png"
+                                                    "url": "https://tjmpromos.github.io/assets/tjmlogo.png"
                                                 },
                                                 {
                                                     "size": 80,
-                                                    "url": "https://sageedsall.github.io/assets/tjmlogo.png"
+                                                    "url": "https://tjmpromos.github.io/assets/tjmlogo.png"
                                                 }
                                             ],
                                             "supertip": {
