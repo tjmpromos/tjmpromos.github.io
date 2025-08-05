@@ -36,12 +36,10 @@
                 Office.context.mailbox.item.subject.getAsync(function(subjectResult) {
                     var subject = (subjectResult.status === Office.AsyncResultStatus.Succeeded && subjectResult.value) ? subjectResult.value : "";
 
-
                     Office.context.mailbox.item.body.getAsync(Office.CoercionType.Text, function(bodyResult) {
                         var body = (bodyResult.status === Office.AsyncResultStatus.Succeeded && bodyResult.value) ? bodyResult.value : "";
 
                         var jobNumber = extractJobNumber(subject) || extractJobNumber(body);
-
 
                         if (!jobNumber) {
                             var container = document.createElement("div");
