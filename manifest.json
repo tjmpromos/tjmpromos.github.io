@@ -2,7 +2,7 @@
     "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.21/MicrosoftTeams.schema.json",
     "id": "0431afed-daf5-4d14-9770-125060723f75",
     "manifestVersion": "1.21",
-    "version": "1.0.0",
+    "version": "1.2.1",
     "name": {
         "short": "Job cc",
         "full": "Job cc"
