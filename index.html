@@ -1,0 +1,129 @@
+<!-- Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License. -->
+<!DOCTYPE html>
+<html>
+
+<head>
+    <!-- Office JavaScript API -->
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+</head>
+
+<body>
+    <button id="jobcc" style="display:none;">Add job+ to ccRecipients</button>
+</body>
+
+<script>
+    Office.onReady((info) => {
+        if (info.host === Office.HostType.Outlook) {
+            document.getElementById("jobcc").onclick = addJobToCc;
+            addJobToCc();
+        }
+    });
+
+    async function addJobToCc() {
+        function extractJobNumber(text) {
+            var match = text.match(/\b(300\d{6})\b/);
+            return match ? match[1] : null;
+        }
+
+        let existingBox = document.getElementById("jobNumberBoxContainer");
+        if (existingBox) existingBox.remove();
+
+        Office.context.mailbox.item.from.getAsync(function(result) {
+            if (result.status === Office.AsyncResultStatus.Succeeded && result.value && result.value.emailAddress) {
+                var fromAddress = result.value.emailAddress;
+                var domain = fromAddress.substring(fromAddress.indexOf('@') + 1);
+
+                Office.context.mailbox.item.subject.getAsync(function(subjectResult) {
+                    var subject = (subjectResult.status === Office.AsyncResultStatus.Succeeded && subjectResult.value) ? subjectResult.value : "";
+
+
+                    Office.context.mailbox.item.body.getAsync(Office.CoercionType.Text, function(bodyResult) {
+                        var body = (bodyResult.status === Office.AsyncResultStatus.Succeeded && bodyResult.value) ? bodyResult.value : "";
+
+                        var jobNumber = extractJobNumber(subject) || extractJobNumber(body);
+
+
+                        if (!jobNumber) {
+                            var container = document.createElement("div");
+                            container.id = "jobNumberBoxContainer";
+                            container.style.marginTop = "10px";
+
+                            var label = document.createElement("label");
+                            label.htmlFor = "jobNumberBox";
+                            label.innerText = "Enter job number: ";
+                            container.appendChild(label);
+
+                            var input = document.createElement("input");
+                            input.type = "text";
+                            input.id = "jobNumberBox";
+                            input.maxLength = 9;
+                            input.pattern = "300[0-9]{6}";
+                            input.style.marginRight = "8px";
+                            container.appendChild(input);
+
+                            var btn = document.createElement("button");
+                            btn.innerText = "Add CC";
+                            btn.onclick = function() {
+                                var val = input.value.trim();
+                                if (/^300\d{6}$/.test(val)) {
+                                    addJobCcWithNumber(val, domain);
+                                    container.remove();
+                                    if (Office.context.ui && Office.context.ui.closeContainer) {
+                                        Office.context.ui.closeContainer();
+                                    }
+                                } else {
+                                    input.style.borderColor = "red";
+                                    input.focus();
+                                }
+                            };
+                            container.appendChild(btn);
+
+                            input.addEventListener("keydown", function(e) {
+                                if (e.key === "Enter") {
+                                    btn.click();
+                                }
+                            });
+
+                            document.body.appendChild(container);
+                            input.focus();
+                            return;
+                        }
+
+                        addJobCcWithNumber(jobNumber, domain);
+                    });
+                });
+            } else {
+                writeToBody("Could not get the 'from' address.");
+                if (Office.context.ui && Office.context.ui.closeContainer) {
+                    Office.context.ui.closeContainer();
+                }
+            }
+        });
+    }
+
+    function addJobCcWithNumber(jobNumber, domain) {
+        var jobEmail = "job+" + jobNumber + "@" + domain;
+        Office.context.mailbox.item.cc.setAsync(
+            [{ emailAddress: jobEmail }],
+            function(setResult) {
+                if (setResult.status === Office.AsyncResultStatus.Failed) {
+                    writeToBody(setResult.error.message);
+                }
+                if (Office.context.ui && Office.context.ui.closeContainer) {
+                    Office.context.ui.closeContainer();
+                }
+            }
+        );
+    }
+
+    function writeToBody(message) {
+        Office.context.mailbox.item.body.appendOnSendAsync(
+            "<div style='color:red'>Add-in error: " + message + "</div>",
+            { coercionType: Office.CoercionType.Html },
+            function () {}
+        );
+    }
+
+</script>
+
+</html>
