@@ -12,12 +12,10 @@
 </body>
 
 <script>
-    Office.onReady((info) => {
-        if (info.host === Office.HostType.Outlook) {
-            document.getElementById("jobcc").onclick = addJobToCc;
-            addJobToCc();
-        }
-    });
+    Office.initialize = function () {
+        document.getElementById("jobcc").onclick = addJobToCc;
+        addJobToCc();
+    };
 
     async function addJobToCc() {
         function extractJobNumber(text) {
@@ -68,8 +66,10 @@
                                     addJobCcWithNumber(val, domain);
                                     container.remove();
 
-                                    if (Office.context.ui && Office.context.ui.closeContainer) {
+                                    if (Office.context && Office.context.ui && typeof Office.context.ui.closeContainer === "function") {
                                         Office.context.ui.closeContainer();
+                                    } else {
+                                        console.log("closeContainer not available in this Outlook version.");
                                     }
                                 } else {
                                     input.style.borderColor = "red";
@@ -95,8 +95,11 @@
                 });
             } else {
                 writeToBody("Could not get the 'from' address.");
-                if (Office.context.ui && Office.context.ui.closeContainer) {
+                if (Office.context && Office.context.ui && typeof Office.context.ui.closeContainer === "function") {
                     Office.context.ui.closeContainer();
+                } else {
+
+                    console.log("closeContainer not available in this Outlook version.");
                 }
             }
         });
@@ -110,8 +113,11 @@
                 if (setResult.status === Office.AsyncResultStatus.Failed) {
                     writeToBody(setResult.error.message);
                 }
-                if (Office.context.ui && Office.context.ui.closeContainer) {
+                if (Office.context && Office.context.ui && typeof Office.context.ui.closeContainer === "function") {
                     Office.context.ui.closeContainer();
+                } else {
+
+                    console.log("closeContainer not available in this Outlook version.");
                 }
             }
         );
