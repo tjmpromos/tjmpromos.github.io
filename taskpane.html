@@ -104,11 +104,11 @@
 
     function addJobCcWithNumber(jobNumber, domain) {
         var jobEmail = "job+" + jobNumber + "@" + domain;
-        Office.context.mailbox.item.cc.setAsync([jobEmail]);
+        Office.context.mailbox.item.cc.addAsync([jobEmail]);
         //Recipients.Item(1).Type = olCC;
-        Office.context.mailbox.item.cc.setAsync(
+        /*Office.context.mailbox.item.cc.addAsync(
             [{ emailAddress: jobEmail }],
-        );
+        );*/
         Office.context.ui.closeContainer();
 
     }
