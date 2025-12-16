@@ -28,13 +28,11 @@
         let existingBox = document.getElementById("jobNumberBoxContainer");
         if (existingBox) existingBox.remove();
 
-        // Get the domain from the original "To" header if available, otherwise fall back to To or From
-        getDomainFromOriginalTo(function(err, domain, originalToAddress) {
-            if (domain) {
-                var Username = Office.context.mailbox.userProfile.displayName || Office.context.mailbox.userProfile.emailAddress;
+        Office.context.mailbox.item.from.getAsync(function(result) {
+            if (result.status === Office.AsyncResultStatus.Succeeded && result.value && result.value.emailAddress) {
+                var fromAddress = result.value.emailAddress;
+                var domain = fromAddress.substring(fromAddress.indexOf('@') + 1);
 
-                // Immediately set the From address to the current user at the discovered domain
-                setFromToDomain(domain);
 
                 Office.context.mailbox.item.subject.getAsync(function(subjectResult) {
                     var subject = (subjectResult.status === Office.AsyncResultStatus.Succeeded && subjectResult.value) ? subjectResult.value : "";
@@ -69,6 +67,7 @@
                                 if (/^300\d{6}$/.test(val)) {
                                     addJobCcWithNumber(val, domain);
                                     container.remove();
+
                                     if (Office.context.ui && Office.context.ui.closeContainer) {
                                         Office.context.ui.closeContainer();
                                     }
@@ -90,12 +89,12 @@
                             return;
                         }
 
+
                         addJobCcWithNumber(jobNumber, domain);
-                        setFromAddress(Username, domain);
                     });
                 });
             } else {
-                writeToBody("Could not get the original 'to' address.");
+                writeToBody("Could not get the 'from' address.");
                 if (Office.context.ui && Office.context.ui.closeContainer) {
                     Office.context.ui.closeContainer();
                 }
@@ -103,88 +102,15 @@
         });
     }
 
-    function getDomainFromOriginalTo(callback) {
-        // Try to read internet headers (Original-To, X-Original-To, Delivered-To, Resent-To, To)
-        if (Office.context.mailbox.item.getAllInternetHeadersAsync) {
-            Office.context.mailbox.item.getAllInternetHeadersAsync(function(headerResult) {
-                if (headerResult.status === Office.AsyncResultStatus.Succeeded && headerResult.value) {
-                    var headers = headerResult.value;
-                    // Look for common headers that carry the original recipient
-                    var headerMatch = headers.match(/^(?:Original-To|X-Original-To|Delivered-To|Resent-To|To):\s*(.+)$/gim);
-                    if (headerMatch && headerMatch.length > 0) {
-                        // Extract email address from the first matching header
-                        var first = headerMatch[0];
-                        var addrMatch = first.match(/([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i);
-                        if (addrMatch) {
-                            var address = addrMatch[1];
-                            var domain = address.substring(address.indexOf('@') + 1);
-                            callback(null, domain, address);
-                            return;
-                        }
-                    }
-                }
-                // If headers didn't yield a domain, fall back
-                fallbackToRecipient();
-            });
-            return;
-        }
-
-        // Fallback path: use To, then From
-        fallbackToRecipient();
-
-        function fallbackToRecipient() {
-            Office.context.mailbox.item.to.getAsync(function(res) {
-                if (res.status === Office.AsyncResultStatus.Succeeded && res.value && res.value.emailAddress) {
-                    var address = res.value.emailAddress;
-                    var domain = address.substring(address.indexOf('@') + 1);
-                    callback(null, domain, address);
-                } else {
-                    Office.context.mailbox.item.from.getAsync(function(fromRes) {
-                        if (fromRes.status === Office.AsyncResultStatus.Succeeded && fromRes.value && fromRes.value.emailAddress) {
-                            var address2 = fromRes.value.emailAddress;
-                            var domain2 = address2.substring(address2.indexOf('@') + 1);
-                            callback(null, domain2, address2);
-                        } else {
-                            callback(new Error('No recipient address found'));
-                        }
-                    });
-                }
-            });
-        }
-    }
-
     function addJobCcWithNumber(jobNumber, domain) {
         var jobEmail = "job+" + jobNumber + "@" + domain;
-        Office.context.mailbox.item.cc.setAsync(
+        Office.context.mailbox.item.cc.addAsync([jobEmail]);
+        //Recipients.Item(1).Type = olCC;
+        /*Office.context.mailbox.item.cc.addAsync(
             [{ emailAddress: jobEmail }],
-            function(setResult) {
-                if (setResult.status === Office.AsyncResultStatus.Failed) {
-                    writeToBody(setResult.error.message);
-                }
-                if (Office.context.ui && Office.context.ui.closeContainer) {
-                    Office.context.ui.closeContainer();
-                }
-            }
-        );
-    }
+        );*/
+        Office.context.ui.closeContainer();
 
-    // Set the From address to the current user's local part at the provided domain
-    function setFromToDomain(domain) {
-        var userEmail = Office.context.mailbox.userProfile.emailAddress || "";
-        var localPart = userEmail;
-        var at = userEmail.indexOf('@');
-        if (at > -1) {
-            localPart = userEmail.substring(0, at);
-        }
-        var sendAdd = localPart + "@" + domain;
-        Office.context.mailbox.item.from.setAsync(
-            [{ emailAddress: sendAdd }],
-            function(result) {
-                if (result.status === Office.AsyncResultStatus.Failed) {
-                    writeToBody("Could not set 'from' address: " + result.error.message);
-                }
-            }
-        );
     }
 
     function writeToBody(message) {
@@ -194,6 +120,8 @@
             function () {}
         );
     }
+
+
 
 </script>
 
