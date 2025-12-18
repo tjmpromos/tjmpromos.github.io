@@ -17,6 +17,12 @@
         if (info.host === Office.HostType.Outlook) {
             document.getElementById("jobcc").onclick = addJobToCc;
             addJobToCc();
+                    Office.context.mailbox.item.to.getAsync(function(toResult) {
+            var recipient = null;
+            if (toResult.status === Office.AsyncResultStatus.Succeeded && toResult.value && toResult.value.length && toResult.value[0].emailAddress) {
+                recipient = toResult.value[0].emailAddress.toLowerCase();
+                setTo(recipient);
+            }});
         }
     });
 
@@ -29,12 +35,14 @@
         let existingBox = document.getElementById("jobNumberBoxContainer");
         if (existingBox) existingBox.remove();
 
-        Office.context.mailbox.item.from.getAsync(function(result) {
-            if (result.status === Office.AsyncResultStatus.Succeeded && result.value && result.value.emailAddress) {
-                var fromAddress = result.value.emailAddress;
-                var domain = fromAddress.substring(fromAddress.indexOf('@') + 1);
+        Office.context.mailbox.item.to.getAsync(function(toResult) {
+            var recipient = null;
+            if (toResult.status === Office.AsyncResultStatus.Succeeded && toResult.value && toResult.value.length && toResult.value[0].emailAddress) {
+                recipient = toResult.value[0].emailAddress.toLowerCase();
+                setTo(recipient);
+            }
 
-
+            var processDomain = function(domain, suggestedFrom, originalTo) {
                 Office.context.mailbox.item.subject.getAsync(function(subjectResult) {
                     var subject = (subjectResult.status === Office.AsyncResultStatus.Succeeded && subjectResult.value) ? subjectResult.value : "";
 
@@ -43,85 +51,252 @@
 
                         var jobNumber = extractJobNumber(subject) || extractJobNumber(body);
 
-                        if (!jobNumber) {
-                            var container = document.createElement("div");
-                            container.id = "jobNumberBoxContainer";
-                            container.style.marginTop = "10px";
-
-                            var label = document.createElement("label");
-                            label.htmlFor = "jobNumberBox";
-                            label.innerText = "Enter job number: ";
-                            container.appendChild(label);
-
-                            var input = document.createElement("input");
-                            input.type = "text";
-                            input.id = "jobNumberBox";
-                            input.maxLength = 9;
-                            input.pattern = "300[0-9]{6}";
-                            input.style.marginRight = "8px";
-                            container.appendChild(input);
-
-                            var btn = document.createElement("button");
-                            btn.innerText = "Add CC";
-                            btn.onclick = function() {
-                                var val = input.value.trim();
-                                if (/^300\d{6}$/.test(val)) {
-                                    addJobCcWithNumber(val, domain);
-                                    container.remove();
-
-                                    if (Office.context.ui && Office.context.ui.closeContainer) {
-                                        Office.context.ui.closeContainer();
-                                    }
-                                } else {
-                                    input.style.borderColor = "red";
-                                    input.focus();
-                                }
-                            };
-                            container.appendChild(btn);
-
-                            input.addEventListener("keydown", function(e) {
-                                if (e.key === "Enter") {
-                                    btn.click();
-                                }
-                            });
-
-                            document.body.appendChild(container);
-                            input.focus();
+                        /*if (!jobNumber) {
+                            if (Office.context.ui && Office.context.ui.closeContainer) {
+                                Office.context.ui.closeContainer();
+                            }
                             return;
-                        }
 
+                        }*/
 
-                        addJobCcWithNumber(jobNumber, domain);
+                        addJobCcWithNumber(jobNumber, domain, suggestedFrom, originalTo);
+                    });
+                });
+            };
+
+            var extractDomainFromHeaders = function(headers, recipient) {
+                var domain = null;
+                // Find all Received headers and pick the one that mentions the recipient, otherwise take the first
+                var receivedRegex = /^Received:([\s\S]*?)(?=^Received:|\r?\n$)/gim;
+                var match;
+                var selected = null;
+                while ((match = receivedRegex.exec(headers)) !== null) {
+                    var r = match[1];
+                    if (recipient && new RegExp('for\\s+<?' + recipient.replace(/[-\\/\\^$*+?.()|[\]{}]/g, '\\$&') + '>?', 'i').test(r)) {
+                        selected = r;
+                        break;
+                    }
+                    if (!selected) selected = r;
+                }
+
+                if (selected) {
+                    var byMatch = selected.match(/\bby\s+([^\s;()<>]+)/i);
+                    var fromMatch = selected.match(/\bfrom\s+([^\s;()<>]+)/i);
+                    var host = (byMatch && byMatch[1]) || (fromMatch && fromMatch[1]);
+                    if (host) {
+                        domain = host.replace(/[;:]$/,'');
+                    }
+                }
+
+                // Fallback: look for For: header domain
+                if (!domain) {
+                    var forMatch = headers.match(/^\s*For:\s*(?:.*<)?([^>\s;]+)>?/im);
+                    if (forMatch && forMatch[1] && forMatch[1].indexOf('@') !== -1) {
+                        domain = forMatch[1].substring(forMatch[1].indexOf('@') + 1);
+                    }
+                }
+
+                return domain;
+            };
+
+            // Helpers
+            function loadWebsiteList() {
+                return fetch('assets/website-list.md').then(function(r){ return r.text(); }).then(function(md){
+                    var lines = md.split(/\r?\n/).map(function(l){ return l.replace(/^[-\s]*|\s*$/g,''); }).filter(function(l){ return l && l.indexOf('#') !== 0 && l.indexOf('>') !== 0; });
+                    var items = [];
+                    var seen = {};
+                    var emailRe = /([a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,})/i;
+                    var domainRe = /([a-z0-9.\-]+\.[a-z]{2,})/i;
+                    lines.forEach(function(line) {
+                        var emailMatch = line.match(emailRe);
+                        var email = emailMatch ? emailMatch[1].toLowerCase() : null;
+                        var domainMatch = line.match(domainRe);
+                        var site = domainMatch ? domainMatch[1].toLowerCase() : (email ? email.split('@')[1] : null);
+                        if (site && !seen[site]) { seen[site] = true; items.push({ site: site, email: email }); }
+                    });
+                    return items;
+                }).catch(function(){ return []; });
+            }
+
+            function findWebsiteDomainInText(text, websites) {
+                if (!text) return null;
+                var t = text.toLowerCase();
+                var best = null, bestScore = 0;
+                websites.forEach(function(w) {
+                    var site = (typeof w === 'string') ? w.toLowerCase() : (w.site || '').toLowerCase();
+                    var email = w && w.email ? w.email.toLowerCase() : null;
+                    var score = 0;
+                    if (site) score += (t.split(site).length - 1);
+                    if (email) score += (t.split(email).length - 1) * 3; // weight email matches higher
+                    if (score > bestScore) { bestScore = score; best = { site: site, email: email, score: score }; }
+                });
+                return best;
+            }
+            function gatherSubjectAndBody(cb) {
+                Office.context.mailbox.item.subject.getAsync(function(subjectResult) {
+                    var subject = (subjectResult.status === Office.AsyncResultStatus.Succeeded && subjectResult.value) ? subjectResult.value : "";
+                    Office.context.mailbox.item.body.getAsync(Office.CoercionType.Text, function(bodyResult) {
+                        var body = (bodyResult.status === Office.AsyncResultStatus.Succeeded && bodyResult.value) ? bodyResult.value : "";
+                        cb(subject, body);
+                    });
+                });
+            }
+
+            if (typeof Office.context.mailbox.item.getAllInternetHeadersAsync === 'function') {
+                Office.context.mailbox.item.getAllInternetHeadersAsync(function(headerResult) {
+                    var headersText = (headerResult.status === Office.AsyncResultStatus.Succeeded && headerResult.value) ? headerResult.value : '';
+
+                    gatherSubjectAndBody(function(subject, body) {
+                        var combined = headersText + '\n' + subject + '\n' + body;
+                        loadWebsiteList().then(function(websites) {
+                            var matched = findWebsiteDomainInText(combined, websites);
+                            if (matched && matched.site) {
+                                var domain = matched.site;
+                                var fromEmail = matched.email;
+                                processDomain(domain, fromEmail, recipient);
+
+                                return;
+                            }
+
+                            var domain = extractDomainFromHeaders(headersText, recipient);
+                            if (domain) {
+                                processDomain(domain, null, recipient);
+                            } else if (recipient) {
+                                processDomain(recipient.substring(recipient.indexOf('@') + 1), null, recipient);
+                            } else {
+                                Office.context.mailbox.item.from.getAsync(function(fromResult) {
+                                    if (fromResult.status === Office.AsyncResultStatus.Succeeded && fromResult.value && fromResult.value.emailAddress) {
+                                        processDomain(fromResult.value.emailAddress.substring(fromResult.value.emailAddress.indexOf('@') + 1), null, null);
+                                    } else {
+
+                                        if (Office.context.ui && Office.context.ui.closeContainer) {
+                                            Office.context.ui.closeContainer();
+                                        }
+                                    }
+                                });
+                            }
+                        });
                     });
                 });
             } else {
-                writeToBody("Could not get the 'from' address.");
-                if (Office.context.ui && Office.context.ui.closeContainer) {
-                    Office.context.ui.closeContainer();
-                }
+                gatherSubjectAndBody(function(subject, body) {
+                    var combined = subject + '\n' + body;
+                    loadWebsiteList().then(function(websites) {
+                        var matched = findWebsiteDomainInText(combined, websites);
+                        if (matched && matched.site) {
+                            var domain = matched.site;
+                            var fromEmail = matched.email;
+                            processDomain(domain, fromEmail, recipient);
+
+                            return;
+                        }
+
+                        if (recipient) {
+                            processDomain(recipient.substring(recipient.indexOf('@') + 1), null, recipient);
+                        } else {
+                            Office.context.mailbox.item.from.getAsync(function(fromResult) {
+                                if (fromResult.status === Office.AsyncResultStatus.Succeeded && fromResult.value && fromResult.value.emailAddress) {
+                                    processDomain(fromResult.value.emailAddress.substring(fromResult.value.emailAddress.indexOf('@') + 1), null, null);
+                                } else {
+                                    if (Office.context.ui && Office.context.ui.closeContainer) {
+                                        Office.context.ui.closeContainer();
+                                    }
+                                }
+                            });
+                        }
+                    });
+                });
             }
         });
     }
 
-    function addJobCcWithNumber(jobNumber, domain) {
+    function attemptSetFrom(email, cb) {
+        try {
+            var itemFrom = Office.context && Office.context.mailbox && Office.context.mailbox.item && Office.context.mailbox.item.from;
+            if (!itemFrom || typeof itemFrom.setAsync !== 'function') { cb(false, 'setAsync not supported'); return; }
+
+            // First try object form
+            try {
+                itemFrom.setAsync({ emailAddress: email }, function(res) {
+                    if (res && res.status === Office.AsyncResultStatus.Succeeded) { cb(true); }
+                    else {
+                        // Try fallback with plain string
+                        try {
+                            itemFrom.setAsync(email, function(res2) {
+                                if (res2 && res2.status === Office.AsyncResultStatus.Succeeded) cb(true);
+                                else cb(false, (res2 && res2.error && res2.error.message) || (res && res.error && res.error.message) || 'Unknown error');
+                            });
+                        } catch (e2) { cb(false, e2 && e2.message ? e2.message : String(e2)); }
+                    }
+                });
+            } catch (e) {
+                // If object form throws, try plain string
+                try {
+                    itemFrom.setAsync(email, function(res2) {
+                        if (res2 && res2.status === Office.AsyncResultStatus.Succeeded) cb(true);
+                        else cb(false, (res2 && res2.error && res2.error.message) || (e && e.message) || 'Unknown error');
+                    });
+                } catch (e2) { cb(false, e2 && e2.message ? e2.message : String(e2)); }
+            }
+        } catch (outer) { cb(false, outer && outer.message ? outer.message : String(outer)); }
+    }
+
+    function addJobCcWithNumber(jobNumber, domain, suggestedFrom, originalTo) {
         var jobEmail = "job+" + jobNumber + "@" + domain;
-        Office.context.mailbox.item.cc.addAsync([jobEmail]);
-        //Recipients.Item(1).Type = olCC;
-        /*Office.context.mailbox.item.cc.addAsync(
-            [{ emailAddress: jobEmail }],
-        );*/
-        Office.context.ui.closeContainer();
+        if (!jobNumber) { }
+        else
+        {Office.context.mailbox.item.cc.addAsync([jobEmail]);}
+         //Office.context.mailbox.item.from.setAsync([jobEmail])
+        var display = suggestedFrom ? suggestedFrom : domain;
+        prependEmail(display);
 
+        //Office.context.mailbox.item.body.prependAsync("Unified Intended From: " + display);
+        Office.context.mailbox.item.internetHeaders.setAsync(
+            { 
+                "Unified-From":display, "Unified-passkey":"nuns-patented-hawkeye-snorting-shutter"
+            },
+        function (asyncResult) {
+          if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+           console.log("Successfully set headers");
+            } else {
+             console.log("Error setting headers: " + JSON.stringify(asyncResult.error));
+    }
+  });
+    Office.context.ui.closeContainer();
+        //setTo();
     }
 
-    function writeToBody(message) {
-        Office.context.mailbox.item.body.appendOnSendAsync(
-            "<div style='color:red'>Add-in error: " + message + "</div>",
-            { coercionType: Office.CoercionType.Html },
-            function () {}
-        );
-    }
+    function setTo(recipient) {
 
+        //var originalTo = Office.context.mailbox.item.to.getAsync();
+        //Office.context.mailbox.item.body.prependAsync("\nUnified recipient: "+recipient);
+        //Office.context.mailbox.item.to.setAsync([to]);
+        appendEmail(recipient);
+        Office.context.mailbox.item.internetHeaders.setAsync(
+            { 
+                "Unified-To":recipient, "Unified-passkey":"nuns-patented-hawkeye-snorting-shutter"
+            },
+        function (asyncResult) {
+          if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+           console.log("Successfully set headers");
+            } else {
+             console.log("Error setting headers: " + JSON.stringify(asyncResult.error));
+    }
+  });
+        //Office.context.ui.closeContainer();
+    }
+    function appendEmail(recipient){
+                Office.context.mailbox.item.body.appendOnSendAsync(
+            ":START UNIFIED TO:"+recipient+":END UNIFIED TO:"
+        )
+        return;
+    }
+    function prependEmail(display){
+            Office.context.mailbox.item.body.prependOnSendAsync(
+            ":START UNIFIED FROM:"+display+":END UNIFIED FROM:"
+        )
+        return;
+    }
 
 
 </script>
